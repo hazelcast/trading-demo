@@ -148,15 +148,15 @@ public class Node {
                     txn.begin();
                     try {
                         Order order = positionSlurperQueue.take();
-                        List<Account> lsAccounts = order.lsAccounts;
-                        for (Account account : lsAccounts) {
-                            if ((position = (PositionEntity) entityPositionMap.get(order.instrument.id)) == null) {
-                                position = new PositionEntity();
-                                position.instrumentId = order.instrument.id;
-                            }
-                            position.addOrder(order);
-                            entityPositionMap.put(position.instrumentId, position);
-                        }
+//                        List<Account> lsAccounts = order.lsAccounts;
+//                        for (Account account : lsAccounts) {
+//                            if ((position = (PositionEntity) entityPositionMap.get(order.instrument.id)) == null) {
+//                                position = new PositionEntity();
+//                                position.instrumentId = order.instrument.id;
+//                            }
+//                            position.addOrder(order);
+//                            entityPositionMap.put(position.instrumentId, position);
+//                        }
                         PositionPortfolioManager position = null;
                         String key = order.instrument.id + "," + order.portfolioManager.id;
                         if ((position = (PositionPortfolioManager) portfolioManagerPositionMap.get(key)) == null) {
