@@ -4,18 +4,19 @@ import java.io.Serializable;
 import java.util.List;
 
 public class Order implements Serializable {
-    Integer id;
-    Instrument instrument;
-    PortfolioManager portfolioManager;
-    Double quantity;
-    Double price;
-    List<Account> lsAccounts;
+    int id;
+    String symbol;
+    int portfolioManagerId;
+    int quantity;
+    double price;
+    List<Integer> lsAccounts;
 
-    Order(Integer _id, Instrument _instrument, PortfolioManager _portfolioManager, Double _quantity, Double _price) {
-        this.id = _id;
-        this.instrument = _instrument;
-        this.portfolioManager = _portfolioManager;
-        this.quantity = _quantity;
-        this.price = _price;
+    public Order(int id, String symbol, int quantity, double price, int portfolioManagerId, List<Integer> lsAccounts) {
+        this.id = id;
+        this.symbol = symbol;
+        this.quantity = quantity;
+        this.price = price;
+        this.portfolioManagerId = portfolioManagerId;
+        this.lsAccounts = lsAccounts;
     }
 }

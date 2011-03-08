@@ -49,7 +49,7 @@ public class Node {
         timer.scheduleAtFixedRate(new TimerTask() {
             @Override
             public void run() {
-                for (int i = 0; i < 300; i++) {
+                for (int i = 0; i < 500; i++) {
                     double price = (int) (Math.random() * 50) + 1;
                     topicFeed.publish(new StockPriceUpdate(StockDatabase.randomPick(), price));
                 }
