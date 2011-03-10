@@ -7,7 +7,6 @@ import java.util.Random;
 import java.util.StringTokenizer;
 
 public class LookupDatabase {
-    final static int PMCount = 100;
     final static Map<Integer, Instrument> mapInstruments = new HashMap<Integer, Instrument>(8000);
     final static Random random = new Random(System.currentTimeMillis());
 

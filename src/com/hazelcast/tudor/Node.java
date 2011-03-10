@@ -88,7 +88,6 @@ public class Node {
                     txn.begin();
                     try {
                         Order order = qOrders.take();
-                        logger.info("Processing " + order);
                         List<Integer> lsAccounts = order.lsAccounts;
                         int accountQuantity = order.quantity / lsAccounts.size();
                         for (Integer account : lsAccounts) {
@@ -97,7 +96,6 @@ public class Node {
                         }
                         String key = order.portfolioManagerId + "," + order.instrumentId;
                         updatePosition(key, order.instrumentId, new Deal(order.quantity, order.price));
-                        logger.info("qOrders size " + qOrders.size());
                         txn.commit();
                     } catch (Throwable t) {
                         t.printStackTrace();
@@ -120,7 +118,6 @@ public class Node {
             }
             position.addDeal(deal);
             mapPositions.put(key, position);
-            logger.info("size " + mapPositions.size());
         }
     }
 }

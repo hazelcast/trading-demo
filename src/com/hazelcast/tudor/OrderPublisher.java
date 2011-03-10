@@ -10,7 +10,7 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class OrderPublisher {
-    final static Map<Integer, List<Instrument>> mapPMInstruments = new HashMap<Integer, List<Instrument>>(1000);
+    final ConcurrentMap<Integer, List<Instrument>> mapPMInstruments = new ConcurrentHashMap<Integer, List<Instrument>>(1000);
     final Timer timer = new Timer();
     volatile PublishTask publishTask = null;
     final HazelcastClient hazelcastClient;
@@ -18,7 +18,7 @@ public class OrderPublisher {
     final Random random = new Random();
     final AtomicInteger orderIds = new AtomicInteger();
     volatile int rate = 1000;
-    final BlockingQueue localQueue = new LinkedBlockingQueue();
+    final BlockingQueue<Order> localQueue = new LinkedBlockingQueue<Order>(5000);
     final ExecutorService es;
 
     public static void main(String[] args) throws Exception {
@@ -41,15 +41,41 @@ public class OrderPublisher {
                 System.out.println("rate is now " + op.rate);
             } else if (command.startsWith("status")) {
                 System.out.println("rate " + op.rate + "  waiting " + op.localQueue.size());
+            } else if (command.startsWith("pm")) {
+                if (command.length() > 3) {
+                    op.updatePMs(Integer.parseInt(command.substring(3).trim()));
+                }
+                System.out.println("pm count is now " + op.mapPMInstruments.size());
             }
         }
     }
 
+    private void updatePMs(int pmCount) {
+        for (int i = 0; i < pmCount; i++) {
+            List<Instrument> lsInstruments = new ArrayList<Instrument>(100);
+            for (int a = 0; a < 100; a++) {
+                lsInstruments.add(LookupDatabase.randomPickInstrument());
+            }
+            mapPMInstruments.putIfAbsent(i, lsInstruments);
+        }
+    }
+
     public OrderPublisher(HazelcastClient client) {
-        es = new ThreadPoolExecutor(40, 40, 60L,
-                TimeUnit.SECONDS,
-                localQueue
-        );
+        es = Executors.newFixedThreadPool(40);
+        for (int i = 0; i < 40; i++) {
+            es.execute(new Runnable() {
+                public void run() {
+                    while (true) {
+                        try {
+                            Order order = localQueue.take();
+                            qOrders.put(order);
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                }
+            });
+        }
         this.hazelcastClient = client;
         this.qOrders = client.getQueue("orders");
         for (int i = 8; i < 1000; i++) {
@@ -85,33 +111,13 @@ public class OrderPublisher {
                 int quantity = 8 * (random.nextInt(100) + 10);
                 int pmId = -1;
                 while (pmId < 8) {
-                    pmId = random.nextInt(LookupDatabase.PMCount);
+                    pmId = random.nextInt(mapPMInstruments.size());
                 }
                 List<Instrument> lsInstruments = mapPMInstruments.get(pmId);
                 Instrument randomInstrument = lsInstruments.get(random.nextInt(lsInstruments.size()));
                 int orderId = orderIds.incrementAndGet();
-                final Order order = new Order(orderId, randomInstrument.id, quantity, price, pmId, lsAccounts);
-                es.execute(new Runnable() {
-                    public void run() {
-                        try {
-                            qOrders.put(order);
-                        } catch (InterruptedException e) {
-                            e.printStackTrace();
-                        }
-                    }
-                });
+                localQueue.offer(new Order(orderId, randomInstrument.id, quantity, price, pmId, lsAccounts));
             }
-        }
-    }
-
-    private class Enqueue implements Runnable {
-        final Order order;
-
-        private Enqueue(Order order) {
-            this.order = order;
-        }
-
-        public void run() {
         }
     }
 }
