@@ -16,7 +16,8 @@ public class Node {
     final HazelcastInstance hazelcast = Hazelcast.newHazelcastInstance(null);
     final ITopic<StockPriceUpdate> topicFeed = hazelcast.getTopic("feed");
     final IQueue<Order> qOrders = hazelcast.getQueue("orders");
-    final IMap<String, Position> mapPositions = hazelcast.getMap("positions"); // pmId,instrumentId
+    final IMap<String, Position> mapPositions = hazelcast.getMap("positions"); // <pmId,instrumentId, Position>
+    final IMap<Integer, Integer> mapNewOrders = hazelcast.getMap("neworders");  // <pmId, instrumentId>
     final AtomicLong countReceivedStockUpdates = new AtomicLong();
     final AtomicLong countOrdersProcessed = new AtomicLong();
     final Logger logger = Logger.getLogger("Node");
@@ -24,7 +25,9 @@ public class Node {
     final ConcurrentMap<Integer, Double> mapStockPrices = new ConcurrentHashMap<Integer, Double>(8000);
     final String memberString = hazelcast.getCluster().getLocalMember().toString();
     final int threads = 40;
-    final ExecutorService threadExecutor = Executors.newFixedThreadPool(threads);
+    final ExecutorService esOrderConsumer = Executors.newFixedThreadPool(threads);
+    final ExecutorService esEventProcessor = Executors.newFixedThreadPool(10);
+    final ConcurrentMap<Integer, Portfolio> localPMPositions = new ConcurrentHashMap<Integer, Portfolio>();
 
     public static void main(String[] args) {
 //        System.setProperty("hazelcast.initial.min.cluster.size", "5");
@@ -33,7 +36,7 @@ public class Node {
 
     void init() {
         for (int i = 0; i < threads; i++) {
-            threadExecutor.execute(new PositionQueueSlurper());
+            esOrderConsumer.execute(new PositionQueueSlurper());
         }
         topicFeed.addMessageListener(new StockStreamListener());
         startStreamer();
@@ -72,6 +75,62 @@ public class Node {
         }
     }
 
+    private void firePositionViewChanged(PositionView positionView) {
+        ITopic topicPM = hazelcast.getTopic("pm_" + positionView.pmId);
+        topicPM.publish(positionView);
+    }
+
+    public PositionView createPositionView(Portfolio portfolio, int instrumentId) {
+        double lastPrice = mapStockPrices.get(instrumentId);
+        Position position = portfolio.getPosition(instrumentId);
+        return new PositionView(portfolio.pmId, instrumentId, position.quantity, lastPrice, portfolio.calculateProfitOrLoss());
+    }
+
+    private Portfolio createOrGetPortfolio(int pmId) {
+        Portfolio portfolio = localPMPositions.get(pmId);
+        if (portfolio == null) {
+            portfolio = new Portfolio();
+            Portfolio existing = localPMPositions.putIfAbsent(pmId, portfolio);
+            if (existing != null) {
+                portfolio = existing;
+            }
+        }
+        return portfolio;
+    }
+
+    class NewOrderListener implements EntryListener<Integer, Integer> {
+        public void entryAdded(final EntryEvent<Integer, Integer> entryEvent) {
+            esEventProcessor.execute(new Runnable() {
+                public void run() {
+                    Integer pmId = entryEvent.getKey();
+                    Integer instrumentId = entryEvent.getValue();
+                    //load all positions for this pm
+                    //and create the Portfolio
+                }
+            });
+        }
+
+        public void entryRemoved(final EntryEvent<Integer, Integer> entryEvent) {
+        }
+
+        public void entryUpdated(final EntryEvent<Integer, Integer> entryEvent) {
+            esEventProcessor.execute(new Runnable() {
+                public void run() {
+                    Integer pmId = entryEvent.getKey();
+                    Integer instrumentId = entryEvent.getValue();
+                    Position position = mapPositions.get(pmId + "," + instrumentId);
+                    Portfolio portfolio = createOrGetPortfolio(pmId);
+                    portfolio.update(position);
+                    PositionView positionView = createPositionView(portfolio, instrumentId);
+                    firePositionViewChanged(positionView);
+                }
+            });
+        }
+
+        public void entryEvicted(final EntryEvent<Integer, Integer> entryEvent) {
+        }
+    }
+
     void log(String msg) {
         if (msg != null) {
             logger.info(msg);
@@ -92,10 +151,10 @@ public class Node {
                         int accountQuantity = order.quantity / lsAccounts.size();
                         for (Integer account : lsAccounts) {
                             String key = account + "," + order.instrumentId;
-                            updatePosition(key, order.instrumentId, new Deal(accountQuantity, order.price));
+                            updatePosition(key, order, accountQuantity);
                         }
                         String key = order.portfolioManagerId + "," + order.instrumentId;
-                        updatePosition(key, order.instrumentId, new Deal(order.quantity, order.price));
+                        updatePosition(key, order, order.quantity);
                         txn.commit();
                     } catch (Throwable t) {
                         t.printStackTrace();
@@ -107,10 +166,11 @@ public class Node {
             }
         }
 
-        public void updatePosition(String key, int instrumentId, Deal deal) {
+        public void updatePosition(String key, Order order, int quantity) {
+            Deal deal = new Deal(quantity, order.price);
             Position position = mapPositions.get(key);
             if (position == null) {
-                position = new Position(instrumentId);
+                position = new Position(order.instrumentId);
             } else if (position.getDealSize() > 100) {
                 for (int i = 0; i < 10; i++) {
                     position.lsDeals.remove(0);
@@ -118,6 +178,7 @@ public class Node {
             }
             position.addDeal(deal);
             mapPositions.put(key, position);
+            mapNewOrders.put(order.portfolioManagerId, order.instrumentId);
         }
     }
 }
