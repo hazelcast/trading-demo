@@ -2,6 +2,7 @@ package com.hazelcast.tudor;
 
 import com.hazelcast.core.*;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -20,6 +21,7 @@ public class Node {
     final IMap<Integer, Integer> mapNewOrders = hazelcast.getMap("neworders");  // <pmId, instrumentId>
     final AtomicLong countReceivedStockUpdates = new AtomicLong();
     final AtomicLong countOrdersProcessed = new AtomicLong();
+    final AtomicLong countNewOrderEvents = new AtomicLong();
     final Logger logger = Logger.getLogger("Node");
     final ITopic<String> topicLogs = hazelcast.getTopic("logs");
     final ConcurrentMap<Integer, Double> mapStockPrices = new ConcurrentHashMap<Integer, Double>(8000);
@@ -28,6 +30,7 @@ public class Node {
     final ExecutorService esOrderConsumer = Executors.newFixedThreadPool(threads);
     final ExecutorService esEventProcessor = Executors.newFixedThreadPool(10);
     final ConcurrentMap<Integer, Portfolio> localPMPositions = new ConcurrentHashMap<Integer, Portfolio>();
+    final ConcurrentMap<Integer, InstrumentInfo> mapInstrumentInfos = new ConcurrentHashMap<Integer, InstrumentInfo>();
 
     public static void main(String[] args) {
 //        System.setProperty("hazelcast.initial.min.cluster.size", "5");
@@ -39,14 +42,17 @@ public class Node {
             esOrderConsumer.execute(new PositionQueueSlurper());
         }
         topicFeed.addMessageListener(new StockStreamListener());
+        mapNewOrders.addLocalEntryListener(new NewOrderListener());
         startStreamer();
         Executors.newSingleThreadExecutor().execute(new Runnable() {
             public void run() {
                 while (true) {
                     try {
                         Thread.sleep(5000);
-                        long updates = countReceivedStockUpdates.getAndSet(0) / 5;
-                        log("ReceivedStocks:" + updates + ", OrdersProcessed: " + countOrdersProcessed.get());
+                        long feeds = countReceivedStockUpdates.getAndSet(0) / 5;
+                        long orders = countOrdersProcessed.getAndSet(0) / 5;
+                        long events = countNewOrderEvents.getAndSet(0) / 5;
+                        log("Feeds:" + feeds + ", OrdersProcessed:" + orders + ", newOrderEvents:" + events);
                     } catch (Exception e) {
                         e.printStackTrace();
                     }
@@ -69,9 +75,19 @@ public class Node {
     }
 
     class StockStreamListener implements MessageListener<StockPriceUpdate> {
-        public void onMessage(StockPriceUpdate stockPriceUpdate) {
-            countReceivedStockUpdates.incrementAndGet();
-            mapStockPrices.put(stockPriceUpdate.getInstrumentId(), stockPriceUpdate.getPrice());
+        public void onMessage(final StockPriceUpdate stockPriceUpdate) {
+            esEventProcessor.execute(new Runnable() {
+                public void run() {
+                    countReceivedStockUpdates.incrementAndGet();
+                    int instrumentId = stockPriceUpdate.getInstrumentId();
+                    mapStockPrices.put(instrumentId, stockPriceUpdate.getPrice());
+                    InstrumentInfo instrumentInfo = createOrGetInstrumentInfo(instrumentId);
+                    Collection<Portfolio> relatedPortfolios = instrumentInfo.getPortfolios();
+                    for (Portfolio relatedPortfolio : relatedPortfolios) {
+                        firePositionViewChanged(createPositionView(relatedPortfolio, instrumentId));
+                    }
+                }
+            });
         }
     }
 
@@ -98,8 +114,21 @@ public class Node {
         return portfolio;
     }
 
+    private InstrumentInfo createOrGetInstrumentInfo(int instrumentId) {
+        InstrumentInfo instrumentInfo = mapInstrumentInfos.get(instrumentId);
+        if (instrumentInfo == null) {
+            instrumentInfo = new InstrumentInfo();
+            InstrumentInfo existing = mapInstrumentInfos.putIfAbsent(instrumentId, instrumentInfo);
+            if (existing != null) {
+                instrumentInfo = existing;
+            }
+        }
+        return instrumentInfo;
+    }
+
     class NewOrderListener implements EntryListener<Integer, Integer> {
         public void entryAdded(final EntryEvent<Integer, Integer> entryEvent) {
+            countNewOrderEvents.incrementAndGet();
             esEventProcessor.execute(new Runnable() {
                 public void run() {
                     Integer pmId = entryEvent.getKey();
@@ -114,12 +143,15 @@ public class Node {
         }
 
         public void entryUpdated(final EntryEvent<Integer, Integer> entryEvent) {
+            countNewOrderEvents.incrementAndGet();
             esEventProcessor.execute(new Runnable() {
                 public void run() {
                     Integer pmId = entryEvent.getKey();
                     Integer instrumentId = entryEvent.getValue();
                     Position position = mapPositions.get(pmId + "," + instrumentId);
                     Portfolio portfolio = createOrGetPortfolio(pmId);
+                    InstrumentInfo instrumentInfo = createOrGetInstrumentInfo(instrumentId);
+                    instrumentInfo.addPortfolio(portfolio);
                     portfolio.update(position);
                     PositionView positionView = createPositionView(portfolio, instrumentId);
                     firePositionViewChanged(positionView);
