@@ -7,39 +7,39 @@ import java.io.DataOutput;
 import java.io.IOException;
 
 public class StockPriceUpdate implements DataSerializable {
-    String symbol;
+    int instrumentId;
     double price;
 
     public StockPriceUpdate() {
     }
 
-    public StockPriceUpdate(String symbol, double price) {
+    public StockPriceUpdate(Integer instrumentId, double price) {
         this.price = price;
-        this.symbol = symbol;
+        this.instrumentId = instrumentId;
     }
 
     public double getPrice() {
         return price;
     }
 
-    public String getSymbol() {
-        return symbol;
+    public int getInstrumentId() {
+        return instrumentId;
     }
 
     public void readData(DataInput in) throws IOException {
-        symbol = in.readUTF();
+        instrumentId = in.readInt();
         price = in.readDouble();
     }
 
     public void writeData(DataOutput out) throws IOException {
-        out.writeUTF(symbol);
+        out.writeInt(instrumentId);
         out.writeDouble(price);
     }
 
     @Override
     public String toString() {
         return "StockPriceUpdate{" +
-                "symbol='" + symbol + '\'' +
+                "instrumentId='" + instrumentId + '\'' +
                 ", price=" + price +
                 '}';
     }

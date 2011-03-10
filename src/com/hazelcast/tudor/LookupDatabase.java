@@ -1,40 +1,39 @@
 package com.hazelcast.tudor;
 
 import java.io.*;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Random;
 import java.util.StringTokenizer;
 
-public class StockDatabase {
-    static List<String> lsStocks = new ArrayList<String>(8000);
-    static Random random = new Random(System.currentTimeMillis());
+public class LookupDatabase {
+    final static int PMCount = 100;
+    final static Map<Integer, Instrument> mapInstruments = new HashMap<Integer, Instrument>(8000);
+    final static Random random = new Random(System.currentTimeMillis());
 
     static {
         load();
     }
 
     private static void load() {
-        String stocksFile = System.getProperty("stocks.file");
-        if (stocksFile == null) {
-            stocksFile = "/apps/projects/hazelcast/space/hztudor/trunk/stocks.txt";
-        }
-        String stocks = readFile(stocksFile);
+        InputStream in = LookupDatabase.class.getResourceAsStream("/stocks.txt");
+        String stocks = readFile(in);
         System.out.println(stocks);
         StringTokenizer st = new StringTokenizer(stocks, ",");
+        int id = 0;
         while (st.hasMoreTokens()) {
             String token = st.nextToken();
             System.out.println(token);
-            lsStocks.add(token);
+            Instrument instrument = new Instrument(id++, token, token);
+            mapInstruments.put(instrument.id, instrument);
         }
     }
 
-    private static String readFile(String filename) {
-        File file = new File(filename);
+    private static String readFile(InputStream in) {
         StringBuffer contents = new StringBuffer();
         BufferedReader reader = null;
         try {
-            reader = new BufferedReader(new FileReader(file));
+            reader = new BufferedReader(new InputStreamReader(in));
             String text = null;
             while ((text = reader.readLine()) != null) {
                 contents.append(text)
@@ -57,11 +56,11 @@ public class StockDatabase {
         return contents.toString();
     }
 
-    public static String randomPick() {
-        return lsStocks.get(random.nextInt(lsStocks.size()));
+    public static Instrument randomPickInstrument() {
+        return mapInstruments.get(random.nextInt(mapInstruments.size()));
     }
 
     public static void main(String[] args) {
-        System.out.println("random " + StockDatabase.randomPick());
+        System.out.println("random " + LookupDatabase.randomPickInstrument());
     }
 }

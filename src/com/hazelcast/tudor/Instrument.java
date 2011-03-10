@@ -12,4 +12,13 @@ public class Instrument implements Serializable {
         this.symbol = _symbol;
         this.name = _name;
     }
+
+    @Override
+    public String toString() {
+        return "Instrument{" +
+                "id=" + id +
+                ", symbol='" + symbol + '\'' +
+                ", name='" + name + '\'' +
+                '}';
+    }
 }

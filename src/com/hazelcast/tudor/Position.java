@@ -1,17 +1,55 @@
 package com.hazelcast.tudor;
 
-import java.io.Serializable;
+import com.hazelcast.nio.DataSerializable;
+
+import java.io.DataInput;
+import java.io.DataOutput;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-public class Position implements Serializable {
+public class Position implements DataSerializable {
     Integer instrumentId;
-    double quantity = 0;
+    int quantity = 0;
+    List<Deal> lsDeals;
 
-    private List<Integer> orderIdList = new ArrayList<Integer>();
+    public Position(Integer instrumentId) {
+        this.instrumentId = instrumentId;
+    }
 
-    public synchronized void addOrder(Order order) throws Exception {
-        this.quantity += order.quantity;
-        this.orderIdList.add(order.id);
+    public Position() {
+    }
+
+    public void addDeal(Deal deal) {
+        if (lsDeals == null) {
+            lsDeals = new ArrayList<Deal>();
+        }
+        this.quantity += deal.quantity;
+        this.lsDeals.add(deal);
+    }
+
+    public void readData(DataInput in) throws IOException {
+        instrumentId = in.readInt();
+        quantity = in.readInt();
+        int size = in.readInt();
+        lsDeals = new ArrayList<Deal>(size);
+        for (int i = 0; i < size; i++) {
+            Deal deal = new Deal();
+            deal.readData(in);
+            lsDeals.add(deal);
+        }
+    }
+
+    public void writeData(DataOutput out) throws IOException {
+        out.writeInt(instrumentId);
+        out.writeInt(quantity);
+        out.writeInt(lsDeals.size());
+        for (Deal deal : lsDeals) {
+            deal.writeData(out);
+        }
+    }
+
+    public int getDealSize() {
+        return (lsDeals == null) ? 0 : lsDeals.size();
     }
 }
