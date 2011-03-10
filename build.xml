@@ -18,6 +18,7 @@
             <fileset dir="${src.dir}"/>
             <fileset dir="${classes.dir}"/>
             <fileset dir="/apps/projects/hazelcast/svn/trunk/hazelcast/target/classes/"/>
+            <fileset dir="/apps/projects/hazelcast/svn/trunk/hazelcast-client/target/classes/"/>
             <file file="stocks.txt"/>
             <manifest>
                 <attribute name="Built-By" value="Hazelcast"/>

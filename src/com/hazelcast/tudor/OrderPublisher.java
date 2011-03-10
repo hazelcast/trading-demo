@@ -6,6 +6,7 @@ import com.hazelcast.core.IQueue;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.util.*;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class OrderPublisher {
@@ -16,6 +17,9 @@ public class OrderPublisher {
     final IQueue<Order> qOrders;
     final Random random = new Random();
     final AtomicInteger orderIds = new AtomicInteger();
+    volatile int rate = 1000;
+    final BlockingQueue localQueue = new LinkedBlockingQueue();
+    final ExecutorService es;
 
     public static void main(String[] args) throws Exception {
         String host = (args != null && args.length > 0) ? args[0] : "localhost";
@@ -30,11 +34,22 @@ public class OrderPublisher {
                 op.stop();
             } else if ("start".equals(command)) {
                 op.start();
+            } else if (command.startsWith("rate")) {
+                if (command.length() > 5) {
+                    op.rate = Integer.parseInt(command.substring(5).trim());
+                }
+                System.out.println("rate is now " + op.rate);
+            } else if (command.startsWith("status")) {
+                System.out.println("rate " + op.rate + "  waiting " + op.localQueue.size());
             }
         }
     }
 
     public OrderPublisher(HazelcastClient client) {
+        es = new ThreadPoolExecutor(40, 40, 60L,
+                TimeUnit.SECONDS,
+                localQueue
+        );
         this.hazelcastClient = client;
         this.qOrders = client.getQueue("orders");
         for (int i = 8; i < 1000; i++) {
@@ -65,7 +80,7 @@ public class OrderPublisher {
             for (int i = 0; i < 8; i++) {
                 lsAccounts.add(i);
             }
-            for (int i = 0; i < 100; i++) {
+            for (int i = 0; i < rate; i++) {
                 double price = random.nextInt(50) + 1;
                 int quantity = 8 * (random.nextInt(100) + 10);
                 int pmId = -1;
@@ -75,13 +90,28 @@ public class OrderPublisher {
                 List<Instrument> lsInstruments = mapPMInstruments.get(pmId);
                 Instrument randomInstrument = lsInstruments.get(random.nextInt(lsInstruments.size()));
                 int orderId = orderIds.incrementAndGet();
-                Order order = new Order(orderId, randomInstrument.id, quantity, price, pmId, lsAccounts);
-                try {
-                    qOrders.put(order);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
+                final Order order = new Order(orderId, randomInstrument.id, quantity, price, pmId, lsAccounts);
+                es.execute(new Runnable() {
+                    public void run() {
+                        try {
+                            qOrders.put(order);
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                });
             }
+        }
+    }
+
+    private class Enqueue implements Runnable {
+        final Order order;
+
+        private Enqueue(Order order) {
+            this.order = order;
+        }
+
+        public void run() {
         }
     }
 }

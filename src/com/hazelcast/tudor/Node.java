@@ -23,7 +23,7 @@ public class Node {
     final ITopic<String> topicLogs = hazelcast.getTopic("logs");
     final ConcurrentMap<Integer, Double> mapStockPrices = new ConcurrentHashMap<Integer, Double>(8000);
     final String memberString = hazelcast.getCluster().getLocalMember().toString();
-    final int threads = 5;
+    final int threads = 40;
     final ExecutorService threadExecutor = Executors.newFixedThreadPool(threads);
 
     public static void main(String[] args) {
