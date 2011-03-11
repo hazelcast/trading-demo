@@ -13,10 +13,12 @@ import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.util.ArrayList;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ConcurrentMap;
 
 public class TraderDesktop {
     final HazelcastClient hazelcastClient;
+    volatile boolean running = true;
 
     public static void main(String args[]) {
         String hostname = (args != null && args.length > 0) ? args[0] : "localhost";
@@ -58,6 +60,8 @@ public class TraderDesktop {
         frame.addWindowListener(new WindowAdapter() {
 
             public void windowClosing(WindowEvent e) {
+                running = false;
+                hazelcastClient.shutdown();
                 System.exit(0);
             }
         });
@@ -72,11 +76,29 @@ public class TraderDesktop {
         final java.util.List<Integer> lsInstrumentIds = new ArrayList<Integer>();
         final ConcurrentMap<Integer, PositionView> positions = new ConcurrentHashMap<Integer, PositionView>(100);
         final JLabel lblCount = new JLabel("0");
+        final java.util.Queue<Integer> updatedRows = new ConcurrentLinkedQueue<Integer>();
 
         PMWindow(String title, int pmId) throws HeadlessException {
             super(title);
             init();
             topic = hazelcastClient.getTopic("pm_" + pmId);
+            new Thread() {
+                @Override
+                public void run() {
+                    while (running) {
+                        try {
+                            Thread.sleep(500);
+                            Integer row = updatedRows.poll();
+                            while (row != null) {
+                                table.removeRowSelectionInterval(row, row);
+                                row = updatedRows.poll();
+                            }
+                        } catch (InterruptedException e) {
+                            return;
+                        }
+                    }
+                }
+            }.start();
             topic.addMessageListener(new MessageListener<PositionView>() {
                 int count = 0;
 
@@ -89,9 +111,9 @@ public class TraderDesktop {
                         tableModel.fireTableRowsInserted(row, row);
                     } else {
                         int row = lsInstrumentIds.indexOf(instrumentId);
-                        table.addRowSelectionInterval(row, row);
                         tableModel.fireTableRowsUpdated(row, row);
-                        table.removeRowSelectionInterval(row, row);
+                        updatedRows.add(row);
+                        table.addRowSelectionInterval(row, row);
                     }
                 }
             });

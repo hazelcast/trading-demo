@@ -34,7 +34,7 @@ public class Node {
     final ConcurrentMap<Integer, InstrumentInfo> mapInstrumentInfos = new ConcurrentHashMap<Integer, InstrumentInfo>();
 
     public static void main(String[] args) {
-//        System.setProperty("hazelcast.initial.min.cluster.size", "5");
+        System.setProperty("hazelcast.initial.min.cluster.size", "3");
         new Node().init();
     }
 
@@ -190,6 +190,7 @@ public class Node {
                 txn.begin();
                 try {
                     Order order = qOrders.take();
+                    countOrdersProcessed.incrementAndGet();
                     List<Integer> lsAccounts = order.lsAccounts;
                     int accountQuantity = order.quantity / lsAccounts.size();
                     for (Integer account : lsAccounts) {

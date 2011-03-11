@@ -17,6 +17,8 @@ public class OrderPublisher {
     final IQueue<Order> qOrders;
     final Random random = new Random();
     final AtomicInteger orderIds = new AtomicInteger();
+    private static final int INITIAL_PM_COUNT = 100;
+    private static final int AVE_INSTRUMENTS_PER_PM = 100;
     volatile int rate = 10;
     final BlockingQueue<Order> localQueue = new LinkedBlockingQueue<Order>(5000);
     final ExecutorService es;
@@ -52,8 +54,8 @@ public class OrderPublisher {
 
     private void updatePMs(int pmCount) {
         for (int i = 0; i < pmCount; i++) {
-            List<Instrument> lsInstruments = new ArrayList<Instrument>(100);
-            for (int a = 0; a < 100; a++) {
+            List<Instrument> lsInstruments = new ArrayList<Instrument>(AVE_INSTRUMENTS_PER_PM);
+            for (int a = 0; a < AVE_INSTRUMENTS_PER_PM; a++) {
                 lsInstruments.add(LookupDatabase.randomPickInstrument());
             }
             mapPMInstruments.putIfAbsent(i, lsInstruments);
@@ -78,9 +80,9 @@ public class OrderPublisher {
         }
         this.hazelcastClient = client;
         this.qOrders = client.getQueue("orders");
-        for (int i = 8; i < 100; i++) {
-            List<Instrument> lsInstruments = new ArrayList<Instrument>(100);
-            for (int a = 0; a < 100; a++) {
+        for (int i = 8; i < INITIAL_PM_COUNT; i++) {
+            List<Instrument> lsInstruments = new ArrayList<Instrument>(AVE_INSTRUMENTS_PER_PM);
+            for (int a = 0; a < AVE_INSTRUMENTS_PER_PM; a++) {
                 lsInstruments.add(LookupDatabase.randomPickInstrument());
             }
             mapPMInstruments.put(i, lsInstruments);
