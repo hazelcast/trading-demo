@@ -21,6 +21,9 @@ public class PositionView implements DataSerializable {
         this.profitOrLoss = profitOrLoss;
     }
 
+    public PositionView() {
+    }
+
     public void readData(DataInput in) throws IOException {
         pmId = in.readInt();
         instrumentId = in.readInt();
@@ -55,5 +58,16 @@ public class PositionView implements DataSerializable {
 
     public int getQuantity() {
         return quantity;
+    }
+
+    @Override
+    public String toString() {
+        return "PositionView{" +
+                "pmId=" + pmId +
+                ", instrumentId=" + instrumentId +
+                ", quantity=" + quantity +
+                ", lastPrice=" + lastPrice +
+                ", profitOrLoss=" + profitOrLoss +
+                '}';
     }
 }

@@ -17,7 +17,7 @@ public class OrderPublisher {
     final IQueue<Order> qOrders;
     final Random random = new Random();
     final AtomicInteger orderIds = new AtomicInteger();
-    volatile int rate = 1000;
+    volatile int rate = 10;
     final BlockingQueue<Order> localQueue = new LinkedBlockingQueue<Order>(5000);
     final ExecutorService es;
 
@@ -78,7 +78,7 @@ public class OrderPublisher {
         }
         this.hazelcastClient = client;
         this.qOrders = client.getQueue("orders");
-        for (int i = 8; i < 1000; i++) {
+        for (int i = 8; i < 100; i++) {
             List<Instrument> lsInstruments = new ArrayList<Instrument>(100);
             for (int a = 0; a < 100; a++) {
                 lsInstruments.add(LookupDatabase.randomPickInstrument());

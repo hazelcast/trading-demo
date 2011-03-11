@@ -55,6 +55,10 @@ public class LookupDatabase {
         return contents.toString();
     }
 
+    public static Instrument getInstrumentById(int instrumentId) {
+        return mapInstruments.get(instrumentId);
+    }
+
     public static Instrument randomPickInstrument() {
         return mapInstruments.get(random.nextInt(mapInstruments.size()));
     }

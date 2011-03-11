@@ -22,6 +22,7 @@ public class Node {
     final AtomicLong countReceivedStockUpdates = new AtomicLong();
     final AtomicLong countOrdersProcessed = new AtomicLong();
     final AtomicLong countNewOrderEvents = new AtomicLong();
+    final AtomicLong countPositionViews = new AtomicLong();
     final Logger logger = Logger.getLogger("Node");
     final ITopic<String> topicLogs = hazelcast.getTopic("logs");
     final ConcurrentMap<Integer, Double> mapStockPrices = new ConcurrentHashMap<Integer, Double>(8000);
@@ -52,7 +53,8 @@ public class Node {
                         long feeds = countReceivedStockUpdates.getAndSet(0) / 5;
                         long orders = countOrdersProcessed.getAndSet(0) / 5;
                         long events = countNewOrderEvents.getAndSet(0) / 5;
-                        log("Feeds:" + feeds + ", OrdersProcessed:" + orders + ", newOrderEvents:" + events);
+                        long views = countPositionViews.getAndSet(0) / 5;
+                        log("Feeds:" + feeds + ", OrdersProcessed:" + orders + ", newOrderEvents:" + events + ", Views:" + views);
                     } catch (Exception e) {
                         e.printStackTrace();
                     }
@@ -92,12 +94,15 @@ public class Node {
     }
 
     private void firePositionViewChanged(PositionView positionView) {
+        if (positionView == null) return;
+        countPositionViews.incrementAndGet();
         ITopic topicPM = hazelcast.getTopic("pm_" + positionView.pmId);
         topicPM.publish(positionView);
     }
 
-    public PositionView createPositionView(Portfolio portfolio, int instrumentId) {
-        double lastPrice = mapStockPrices.get(instrumentId);
+    public PositionView createPositionView(Portfolio portfolio, Integer instrumentId) {
+        Double lastPrice = mapStockPrices.get(instrumentId);
+        if (lastPrice == null) return null;
         Position position = portfolio.getPosition(instrumentId);
         return new PositionView(portfolio.pmId, instrumentId, position.quantity, lastPrice, portfolio.calculateProfitOrLoss());
     }
@@ -105,7 +110,7 @@ public class Node {
     private Portfolio createOrGetPortfolio(int pmId) {
         Portfolio portfolio = localPMPositions.get(pmId);
         if (portfolio == null) {
-            portfolio = new Portfolio();
+            portfolio = new Portfolio(pmId);
             Portfolio existing = localPMPositions.putIfAbsent(pmId, portfolio);
             if (existing != null) {
                 portfolio = existing;
@@ -146,17 +151,24 @@ public class Node {
             countNewOrderEvents.incrementAndGet();
             esEventProcessor.execute(new Runnable() {
                 public void run() {
-                    Integer pmId = entryEvent.getKey();
-                    Integer instrumentId = entryEvent.getValue();
-                    Position position = mapPositions.get(pmId + "," + instrumentId);
-                    Portfolio portfolio = createOrGetPortfolio(pmId);
-                    InstrumentInfo instrumentInfo = createOrGetInstrumentInfo(instrumentId);
-                    instrumentInfo.addPortfolio(portfolio);
-                    portfolio.update(position);
-                    PositionView positionView = createPositionView(portfolio, instrumentId);
-                    firePositionViewChanged(positionView);
+                    try {
+                        Integer pmId = entryEvent.getKey();
+                        Integer instrumentId = entryEvent.getValue();
+                        Position position = mapPositions.get(pmId + "," + instrumentId);
+                        if (position != null) {
+                            Portfolio portfolio = createOrGetPortfolio(pmId);
+                            InstrumentInfo instrumentInfo = createOrGetInstrumentInfo(instrumentId);
+                            instrumentInfo.addPortfolio(portfolio);
+                            portfolio.update(position);
+                            PositionView positionView = createPositionView(portfolio, instrumentId);
+                            firePositionViewChanged(positionView);
+                        }
+                    } catch (Throwable e) {
+                        e.printStackTrace();
+                    }
                 }
-            });
+            }
+            );
         }
 
         public void entryEvicted(final EntryEvent<Integer, Integer> entryEvent) {
@@ -174,31 +186,27 @@ public class Node {
 
         public void run() {
             while (true) {
+                Transaction txn = hazelcast.getTransaction();
+                txn.begin();
                 try {
-                    Transaction txn = hazelcast.getTransaction();
-                    txn.begin();
-                    try {
-                        Order order = qOrders.take();
-                        List<Integer> lsAccounts = order.lsAccounts;
-                        int accountQuantity = order.quantity / lsAccounts.size();
-                        for (Integer account : lsAccounts) {
-                            String key = account + "," + order.instrumentId;
-                            updatePosition(key, order, accountQuantity);
-                        }
-                        String key = order.portfolioManagerId + "," + order.instrumentId;
-                        updatePosition(key, order, order.quantity);
-                        txn.commit();
-                    } catch (Throwable t) {
-                        t.printStackTrace();
-                        txn.rollback();
+                    Order order = qOrders.take();
+                    List<Integer> lsAccounts = order.lsAccounts;
+                    int accountQuantity = order.quantity / lsAccounts.size();
+                    for (Integer account : lsAccounts) {
+                        String key = account + "," + order.instrumentId;
+                        updatePosition(key, order, account, accountQuantity);
                     }
-                } catch (Exception e) {
-                    e.printStackTrace();
+                    String key = order.portfolioManagerId + "," + order.instrumentId;
+                    updatePosition(key, order, order.portfolioManagerId, order.quantity);
+                    txn.commit();
+                } catch (Throwable t) {
+                    t.printStackTrace();
+                    txn.rollback();
                 }
             }
         }
 
-        public void updatePosition(String key, Order order, int quantity) {
+        public void updatePosition(String key, Order order, int pmId, int quantity) {
             Deal deal = new Deal(quantity, order.price);
             Position position = mapPositions.get(key);
             if (position == null) {
@@ -210,7 +218,7 @@ public class Node {
             }
             position.addDeal(deal);
             mapPositions.put(key, position);
-            mapNewOrders.put(order.portfolioManagerId, order.instrumentId);
+            mapNewOrders.put(pmId, order.instrumentId);
         }
     }
 }
