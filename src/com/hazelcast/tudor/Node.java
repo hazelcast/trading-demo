@@ -2,10 +2,7 @@ package com.hazelcast.tudor;
 
 import com.hazelcast.core.*;
 
-import java.util.Collection;
-import java.util.List;
-import java.util.Timer;
-import java.util.TimerTask;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutorService;
@@ -27,14 +24,14 @@ public class Node {
     final ITopic<String> topicLogs = hazelcast.getTopic("logs");
     final ConcurrentMap<Integer, Double> mapStockPrices = new ConcurrentHashMap<Integer, Double>(8000);
     final String memberString = hazelcast.getCluster().getLocalMember().toString();
-    final int threads = 40;
+    final int threads = 100;
     final ExecutorService esOrderConsumer = Executors.newFixedThreadPool(threads);
     final ExecutorService esEventProcessor = Executors.newFixedThreadPool(10);
     final ConcurrentMap<Integer, Portfolio> localPMPositions = new ConcurrentHashMap<Integer, Portfolio>();
     final ConcurrentMap<Integer, InstrumentInfo> mapInstrumentInfos = new ConcurrentHashMap<Integer, InstrumentInfo>();
 
     public static void main(String[] args) {
-        System.setProperty("hazelcast.initial.min.cluster.size", "3");
+        System.setProperty("hazelcast.mc.topic.excludes", "pm.*");
         new Node().init();
     }
 
@@ -188,18 +185,24 @@ public class Node {
             while (true) {
                 Transaction txn = hazelcast.getTransaction();
                 txn.begin();
+                Set<Integer> setAllInvolvedPMs = new HashSet<Integer>(9);
                 try {
                     Order order = qOrders.take();
                     countOrdersProcessed.incrementAndGet();
                     List<Integer> lsAccounts = order.lsAccounts;
                     int accountQuantity = order.quantity / lsAccounts.size();
-                    for (Integer account : lsAccounts) {
-                        String key = account + "," + order.instrumentId;
-                        updatePosition(key, order, account, accountQuantity);
-                    }
+//                    for (Integer account : lsAccounts) {
+//                        String key = account + "," + order.instrumentId;
+//                        updatePosition(key, order, account, accountQuantity);
+//                    }
                     String key = order.portfolioManagerId + "," + order.instrumentId;
                     updatePosition(key, order, order.portfolioManagerId, order.quantity);
                     txn.commit();
+//                    setAllInvolvedPMs.addAll(lsAccounts);
+                    setAllInvolvedPMs.add(order.portfolioManagerId);
+                    for (Integer involvedPM : setAllInvolvedPMs) {
+                        mapNewOrders.put(involvedPM, order.instrumentId);
+                    }
                 } catch (Throwable t) {
                     t.printStackTrace();
                     txn.rollback();
@@ -219,7 +222,6 @@ public class Node {
             }
             position.addDeal(deal);
             mapPositions.put(key, position);
-            mapNewOrders.put(pmId, order.instrumentId);
         }
     }
 }
