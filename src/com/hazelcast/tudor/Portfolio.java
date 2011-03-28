@@ -15,10 +15,6 @@ public class Portfolio {
         mapPositions.put(position.instrumentId, position);
     }
 
-    public double calculateProfitOrLoss() {
-        return 0;
-    }
-
     public Position getPosition(int instrumentId) {
         return mapPositions.get(instrumentId);
     }

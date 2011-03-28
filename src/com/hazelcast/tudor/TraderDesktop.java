@@ -11,7 +11,9 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
+import java.text.NumberFormat;
 import java.util.ArrayList;
+import java.util.Locale;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ConcurrentMap;
@@ -130,6 +132,7 @@ public class TraderDesktop {
 
         class PMTableModel extends AbstractTableModel {
             private String[] columnNames = {"#", "Instrument", "Quantity", "CurrentPrice", "P&L"};
+            final NumberFormat currencyFormat = NumberFormat.getCurrencyInstance(Locale.US);
 
             public int getColumnCount() {
                 return columnNames.length;
@@ -155,7 +158,7 @@ public class TraderDesktop {
                 else if (col == 3)
                     return pw.getLastPrice();
                 else if (col == 4)
-                    return pw.getProfitOrLoss();
+                    return currencyFormat.format(pw.getProfitOrLoss());
                 return "ERROR";
             }
 

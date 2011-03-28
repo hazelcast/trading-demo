@@ -49,6 +49,16 @@ public class Position implements DataSerializable {
         }
     }
 
+    public double calculateProfitLoss(double lastPrice) {
+        double profitOrLoss = 0;
+        if (lsDeals != null) {
+            for (Deal deal : lsDeals) {
+                profitOrLoss += deal.quantity * (lastPrice - deal.price);
+            }
+        }
+        return profitOrLoss;
+    }
+
     public int getDealSize() {
         return (lsDeals == null) ? 0 : lsDeals.size();
     }

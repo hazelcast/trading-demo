@@ -101,7 +101,7 @@ public class Node {
         Double lastPrice = mapStockPrices.get(instrumentId);
         if (lastPrice == null) return null;
         Position position = portfolio.getPosition(instrumentId);
-        return new PositionView(portfolio.pmId, instrumentId, position.quantity, lastPrice, portfolio.calculateProfitOrLoss());
+        return new PositionView(portfolio.pmId, instrumentId, position.quantity, lastPrice, position.calculateProfitLoss(lastPrice));
     }
 
     private Portfolio createOrGetPortfolio(int pmId) {
