@@ -1,5 +1,6 @@
 package com.hazelcast.tudor;
 
+import com.hazelcast.client.ClientConfig;
 import com.hazelcast.client.HazelcastClient;
 import com.hazelcast.core.IQueue;
 
@@ -25,7 +26,9 @@ public class OrderPublisher {
 
     public static void main(String[] args) throws Exception {
         String host = (args != null && args.length > 0) ? args[0] : "localhost";
-        HazelcastClient client = HazelcastClient.newHazelcastClient("dev", "dev-pass", host);
+        ClientConfig config = new ClientConfig();
+        config.addAddress(host);
+        HazelcastClient client = HazelcastClient.newHazelcastClient(config);
         OrderPublisher op = new OrderPublisher(client);
         BufferedReader in = new BufferedReader(new InputStreamReader(System.in));
         op.start();

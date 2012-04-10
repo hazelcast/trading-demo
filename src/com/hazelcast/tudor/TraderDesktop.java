@@ -1,7 +1,9 @@
 package com.hazelcast.tudor;
 
+import com.hazelcast.client.ClientConfig;
 import com.hazelcast.client.HazelcastClient;
 import com.hazelcast.core.ITopic;
+import com.hazelcast.core.Message;
 import com.hazelcast.core.MessageListener;
 
 import javax.swing.*;
@@ -29,7 +31,9 @@ public class TraderDesktop {
     }
 
     public TraderDesktop(String hostname) {
-        hazelcastClient = HazelcastClient.newHazelcastClient("dev", "dev-pass", hostname);
+        ClientConfig config = new ClientConfig();
+        config.addAddress(hostname);
+        hazelcastClient = HazelcastClient.newHazelcastClient(config);
     }
 
     void init() {
@@ -104,10 +108,10 @@ public class TraderDesktop {
             topic.addMessageListener(new MessageListener<PositionView>() {
                 int count = 0;
 
-                public void onMessage(PositionView pv) {
+                public void onMessage(Message<PositionView> pv) {
                     lblCount.setText(String.valueOf(count++));
-                    Integer instrumentId = pv.getInstrumentId();
-                    if (positions.put(instrumentId, pv) == null) {
+                    Integer instrumentId = pv.getMessageObject().getInstrumentId();
+                    if (positions.put(instrumentId, pv.getMessageObject()) == null) {
                         lsInstrumentIds.add(instrumentId);
                         int row = lsInstrumentIds.indexOf(instrumentId);
                         tableModel.fireTableRowsInserted(row, row);

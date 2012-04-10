@@ -74,12 +74,12 @@ public class Node {
     }
 
     class StockStreamListener implements MessageListener<StockPriceUpdate> {
-        public void onMessage(final StockPriceUpdate stockPriceUpdate) {
+        public void onMessage(final Message<StockPriceUpdate> stockPriceUpdate) {
             esEventProcessor.execute(new Runnable() {
                 public void run() {
                     countReceivedStockUpdates.incrementAndGet();
-                    int instrumentId = stockPriceUpdate.getInstrumentId();
-                    mapStockPrices.put(instrumentId, stockPriceUpdate.getPrice());
+                    int instrumentId = stockPriceUpdate.getMessageObject().getInstrumentId();
+                    mapStockPrices.put(instrumentId, stockPriceUpdate.getMessageObject().getPrice());
                     InstrumentInfo instrumentInfo = createOrGetInstrumentInfo(instrumentId);
                     Collection<Portfolio> relatedPortfolios = instrumentInfo.getPortfolios();
                     for (Portfolio relatedPortfolio : relatedPortfolios) {
