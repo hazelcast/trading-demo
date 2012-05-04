@@ -1,4 +1,4 @@
-package com.hazelcast.tudor;
+package com.hazelcast.demo.trading;
 
 public class Account {
     String id;

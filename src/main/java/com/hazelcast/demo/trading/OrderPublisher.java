@@ -1,4 +1,4 @@
-package com.hazelcast.tudor;
+package com.hazelcast.demo.trading;
 
 import com.hazelcast.client.ClientConfig;
 import com.hazelcast.client.HazelcastClient;

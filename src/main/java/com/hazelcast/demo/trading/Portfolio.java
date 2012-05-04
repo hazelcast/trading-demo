@@ -1,4 +1,4 @@
-package com.hazelcast.tudor;
+package com.hazelcast.demo.trading;
 
 import java.util.HashMap;
 import java.util.Map;
