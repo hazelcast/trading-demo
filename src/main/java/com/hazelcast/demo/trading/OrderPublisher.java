@@ -1,7 +1,8 @@
 package com.hazelcast.demo.trading;
 
-import com.hazelcast.client.ClientConfig;
 import com.hazelcast.client.HazelcastClient;
+import com.hazelcast.client.config.ClientConfig;
+import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.core.IQueue;
 
 import java.io.BufferedReader;
@@ -14,7 +15,7 @@ public class OrderPublisher {
     final ConcurrentMap<Integer, List<Instrument>> mapPMInstruments = new ConcurrentHashMap<Integer, List<Instrument>>(1000);
     final Timer timer = new Timer();
     volatile PublishTask publishTask = null;
-    final HazelcastClient hazelcastClient;
+    final HazelcastInstance hazelcastClient;
     final IQueue<Order> qOrders;
     final Random random = new Random();
     final AtomicInteger orderIds = new AtomicInteger();
@@ -28,7 +29,7 @@ public class OrderPublisher {
         String host = (args != null && args.length > 0) ? args[0] : "localhost";
         ClientConfig config = new ClientConfig();
         config.addAddress(host);
-        HazelcastClient client = HazelcastClient.newHazelcastClient(config);
+        HazelcastInstance client = HazelcastClient.newHazelcastClient(config);
         OrderPublisher op = new OrderPublisher(client);
         BufferedReader in = new BufferedReader(new InputStreamReader(System.in));
         op.start();
@@ -65,7 +66,7 @@ public class OrderPublisher {
         }
     }
 
-    public OrderPublisher(HazelcastClient client) {
+    public OrderPublisher(HazelcastInstance client) {
         es = Executors.newFixedThreadPool(40);
         for (int i = 0; i < 40; i++) {
             es.execute(new Runnable() {

@@ -1,6 +1,8 @@
 package com.hazelcast.demo.trading;
 
 import com.hazelcast.core.*;
+import com.hazelcast.transaction.TransactionContext;
+import com.hazelcast.transaction.TransactionOptions;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -183,8 +185,8 @@ public class Node {
 
         public void run() {
             while (true) {
-                Transaction txn = hazelcast.getTransaction();
-                txn.begin();
+                TransactionContext context = hazelcast.newTransactionContext();
+                context.beginTransaction();
                 Set<Integer> setAllInvolvedPMs = new HashSet<Integer>(9);
                 try {
                     Order order = qOrders.take();
@@ -197,7 +199,7 @@ public class Node {
 //                    }
                     String key = order.portfolioManagerId + "," + order.instrumentId;
                     updatePosition(key, order, order.portfolioManagerId, order.quantity);
-                    txn.commit();
+                    context.commitTransaction();
 //                    setAllInvolvedPMs.addAll(lsAccounts);
                     setAllInvolvedPMs.add(order.portfolioManagerId);
                     for (Integer involvedPM : setAllInvolvedPMs) {
@@ -205,7 +207,7 @@ public class Node {
                     }
                 } catch (Throwable t) {
                     t.printStackTrace();
-                    txn.rollback();
+                    context.rollbackTransaction();
                 }
             }
         }

@@ -1,7 +1,8 @@
 package com.hazelcast.demo.trading;
 
-import com.hazelcast.client.ClientConfig;
 import com.hazelcast.client.HazelcastClient;
+import com.hazelcast.client.config.ClientConfig;
+import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.core.ITopic;
 import com.hazelcast.core.Message;
 import com.hazelcast.core.MessageListener;
@@ -21,7 +22,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ConcurrentMap;
 
 public class TraderDesktop {
-    final HazelcastClient hazelcastClient;
+    final HazelcastInstance hazelcastClient;
     volatile boolean running = true;
 
     public static void main(String args[]) {
@@ -67,7 +68,7 @@ public class TraderDesktop {
 
             public void windowClosing(WindowEvent e) {
                 running = false;
-                hazelcastClient.shutdown();
+                hazelcastClient.getLifecycleService().shutdown();
                 System.exit(0);
             }
         });
