@@ -12,7 +12,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <jdk.version>1.5</jdk.version>
         <target.dir>target</target.dir>
-        <hazelcast.version>2.0.3</hazelcast.version>
+        <hazelcast.version>3.0-RC1</hazelcast.version>
     </properties>
 
     <build>

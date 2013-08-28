@@ -1,9 +1,9 @@
 package com.hazelcast.demo.trading;
 
-import com.hazelcast.nio.DataSerializable;
+import com.hazelcast.nio.ObjectDataInput;
+import com.hazelcast.nio.ObjectDataOutput;
+import com.hazelcast.nio.serialization.DataSerializable;
 
-import java.io.DataInput;
-import java.io.DataOutput;
 import java.io.IOException;
 
 public class StockPriceUpdate implements DataSerializable {
@@ -26,12 +26,12 @@ public class StockPriceUpdate implements DataSerializable {
         return instrumentId;
     }
 
-    public void readData(DataInput in) throws IOException {
+    public void readData(ObjectDataInput in) throws IOException {
         instrumentId = in.readInt();
         price = in.readDouble();
     }
 
-    public void writeData(DataOutput out) throws IOException {
+    public void writeData(ObjectDataOutput out) throws IOException {
         out.writeInt(instrumentId);
         out.writeDouble(price);
     }
